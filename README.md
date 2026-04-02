@@ -2,6 +2,8 @@
 
 A mobile-first workout tracker built with Next.js 14, TypeScript, Tailwind CSS, Prisma, and PostgreSQL.
 
+Recommended runtime: Node.js 20 LTS. The project includes an `.nvmrc` file for that version.
+
 ---
 
 ## PostgreSQL Setup (macOS / Homebrew)
@@ -31,6 +33,10 @@ psql -d gymlog -c "SELECT version();"
 ```bash
 # 1. Clone / enter project
 cd gymlog
+
+# 1.5 Use Node 20
+nvm use
+  # or install it first with: nvm install 20
 
 # 2. Install dependencies
 npm install
