@@ -1,0 +1,9 @@
+.DS_Store
+.env*
+!.env.example
+.next
+node_modules
+coverage
+npm-debug.log*
+mnt/user-data
+.vercel

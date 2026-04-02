@@ -1,0 +1,12 @@
+@import url("https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap");
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+* { -webkit-tap-highlight-color: transparent; }
+html, body { background-color: #0d0d0d; color: #f0f0f0; }
+input[type="number"]::-webkit-outer-spin-button,
+input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+input[type="number"] { -moz-appearance: textfield; }
+button:active { transform: scale(0.97); }
+/* optional: better tap highlights on mobile */
+* { -webkit-tap-highlight-color: transparent; }
