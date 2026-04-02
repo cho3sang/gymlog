@@ -1,119 +1,125 @@
-# GymLog — Workout Tracker MVP
+# GymLog
 
-A mobile-first workout tracker built with Next.js 14, TypeScript, Tailwind CSS, Prisma, and PostgreSQL.
+GymLog is a mobile-first workout tracker for logging lifting sessions, reviewing workout history, and tracking exercise progress over time.
 
-Recommended runtime: Node.js 20 LTS. The project includes an `.nvmrc` file for that version.
+It is built with Next.js, TypeScript, Prisma, and PostgreSQL, with a simple demo-user flow so you can run it locally without setting up auth first.
 
----
+## Features
 
-## PostgreSQL Setup (macOS / Homebrew)
+- Start and continue an active workout session
+- Add exercises while you train
+- Log sets with weight and reps
+- Delete sets if you make a mistake
+- Finish workouts and save them to history
+- Review completed sessions with exercise count, set count, and total volume
+- Open a workout to see the full exercise-by-exercise set breakdown
+- Track progress for individual exercises
+- See best set, best estimated 1RM, and best estimated 1RM in the last 30 days
+- Use a mobile-first interface designed for quick logging during training
+
+## Stack
+
+- Next.js 14 App Router
+- TypeScript
+- Tailwind CSS
+- Prisma
+- PostgreSQL
+
+## Local Setup
+
+Recommended runtime: Node.js 20 LTS.
+
+This repo includes an `.nvmrc` file, so if you use `nvm`:
 
 ```bash
-# 1. Install PostgreSQL 16
-brew install postgresql@16
-
-# 2. Add to PATH (add to ~/.zshrc or ~/.bash_profile)
-echo 'export PATH="/opt/homebrew/opt/postgresql@16/bin:$PATH"' >> ~/.zshrc
-source ~/.zshrc
-
-# 3. Start the service
-brew services start postgresql@16
-
-# 4. Create the database
-createdb gymlog
-
-# 5. (Optional) Verify connection
-psql -d gymlog -c "SELECT version();"
+nvm install 20
+nvm use 20
 ```
 
----
-
-## App Setup
+Then install dependencies:
 
 ```bash
-# 1. Clone / enter project
-cd gymlog
-
-# 1.5 Use Node 20
-nvm use
-  # or install it first with: nvm install 20
-
-# 2. Install dependencies
 npm install
+```
 
-# 3. Create .env file
+## PostgreSQL Setup
+
+Example setup on macOS with Homebrew:
+
+```bash
+brew install postgresql@16
+brew services start postgresql@16
+createdb gymlog
+```
+
+## Environment Variables
+
+Create a local env file:
+
+```bash
 cp .env.example .env
-# Edit .env — replace <your_user> with your macOS username (run `whoami`)
-
-# 4. Run Prisma migrations
-npx prisma migrate dev --name init
-
-# 5. Seed the demo user
-npx prisma db seed
-
-# 6. Start dev server
-npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) on your phone or browser.
+Default local database connection:
 
----
-
-## .env
-
-```
+```env
 DATABASE_URL="postgresql://<your_user>@localhost:5432/gymlog"
 ```
 
-Replace `<your_user>` with your macOS username (`whoami` in terminal).
+Replace `<your_user>` with your macOS username.
 
----
+## Run The App
 
-## Tech Stack
+Apply the database schema and seed the demo user:
 
-| Layer      | Tech                         |
-|------------|------------------------------|
-| Framework  | Next.js 14 (App Router)      |
-| Language   | TypeScript                   |
-| Styles     | Tailwind CSS                 |
-| ORM        | Prisma                       |
-| Database   | PostgreSQL 16                |
-| Auth       | None (demo user hardcoded)   |
-
----
-
-## File Tree
-
+```bash
+npx prisma migrate dev --name init
+npx prisma db seed
 ```
-gymlog/
-├── README.md
-├── .env.example
-├── .gitignore
-├── package.json
-├── tsconfig.json
-├── tailwind.config.ts
-├── postcss.config.js
-├── prisma/
-│   ├── schema.prisma
-│   └── seed.ts
-└── src/
-    ├── app/
-    │   ├── globals.css
-    │   ├── layout.tsx          ← Root layout + bottom nav
-    │   ├── page.tsx            ← Home
-    │   ├── log/
-    │   │   └── page.tsx        ← Active workout logger
-    │   ├── history/
-    │   │   ├── page.tsx        ← Finished sessions list
-    │   │   └── [id]/
-    │   │       └── page.tsx    ← Session detail
-    │   └── progress/
-    │       └── page.tsx        ← Exercise progress + 1RM
-    ├── components/
-    │   ├── BottomNav.tsx
-    │   └── PageHeader.tsx
-    ├── lib/
-    │   └── prisma.ts
-    └── actions/
-        └── workout.ts          ← All server actions
+
+Start the dev server:
+
+```bash
+npm run dev
+```
+
+Open [http://localhost:3000](http://localhost:3000).
+
+## Use It On Your Phone
+
+If your phone and laptop are on the same Wi-Fi network, you can open the app from your phone browser.
+
+Start the dev server so it listens on your network:
+
+```bash
+npm run dev -- --hostname 0.0.0.0
+```
+
+Then find your laptop's local IP address:
+
+```bash
+ipconfig getifaddr en0
+```
+
+On your phone, open:
+
+```text
+http://YOUR_LOCAL_IP:3000
+```
+
+If you want it to feel more app-like, add it to your home screen from Safari or Chrome.
+
+## Project Notes
+
+- The current app uses a hardcoded demo user instead of authentication.
+- Workout data is stored in PostgreSQL through Prisma.
+- Prisma migrations are stored in `prisma/migrations`.
+
+## Scripts
+
+```bash
+npm run dev
+npm run build
+npm run start
+npm run lint
 ```
