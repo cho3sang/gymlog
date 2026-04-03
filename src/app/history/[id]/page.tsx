@@ -1,7 +1,8 @@
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import PageHeader from "@/components/PageHeader";
 import { getSessionDetails } from "@/actions/workout";
+import { getCurrentViewer } from "@/lib/current-user";
 
 export const dynamic = "force-dynamic";
 
@@ -26,6 +27,12 @@ export default async function HistoryDetailPage({
 }: {
   params: { id: string };
 }) {
+  const viewer = await getCurrentViewer();
+
+  if (!viewer) {
+    redirect("/");
+  }
+
   const session = await getSessionDetails(params.id);
 
   if (!session) {

@@ -5,12 +5,6 @@ import { EXERCISE_LIBRARY } from "../src/lib/workoutData";
 const prisma = new PrismaClient();
 
 async function main() {
-  await prisma.user.upsert({
-    where: { id: "demo" },
-    update: {},
-    create: { id: "demo" },
-  });
-
   await Promise.all(
     EXERCISE_LIBRARY.map((exercise) =>
       prisma.exercise.upsert({
@@ -30,7 +24,7 @@ async function main() {
     )
   );
 
-  console.log("✅ Demo user and exercise library seeded");
+  console.log("✅ Exercise library seeded");
 }
 
 main()

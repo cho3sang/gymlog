@@ -1,6 +1,8 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import PageHeader from "@/components/PageHeader";
 import { listFinishedSessions } from "@/actions/workout";
+import { getCurrentViewer } from "@/lib/current-user";
 
 export const dynamic = "force-dynamic";
 
@@ -21,6 +23,12 @@ function formatTime(date: Date) {
 }
 
 export default async function HistoryPage() {
+  const viewer = await getCurrentViewer();
+
+  if (!viewer) {
+    redirect("/");
+  }
+
   const sessions = await listFinishedSessions();
 
   return (

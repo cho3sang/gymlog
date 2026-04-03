@@ -1,10 +1,18 @@
+import { redirect } from "next/navigation";
 import { listExercisesForUser } from "@/actions/workout";
 import PageHeader from "@/components/PageHeader";
+import { getCurrentViewer } from "@/lib/current-user";
 import ProgressClient from "./ProgressClient";
 
 export const dynamic = "force-dynamic";
 
 export default async function ProgressPage() {
+  const viewer = await getCurrentViewer();
+
+  if (!viewer) {
+    redirect("/");
+  }
+
   const exercises = await listExercisesForUser();
 
   return (

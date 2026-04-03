@@ -1,6 +1,7 @@
 "use server";
 
 import { prisma } from "@/lib/prisma";
+import { requireCurrentViewer } from "@/lib/current-user";
 import {
   BUILT_IN_PLANS,
   EXERCISE_LIBRARY,
@@ -9,8 +10,6 @@ import {
   getExerciseLibraryDetails,
 } from "@/lib/workoutData";
 import { revalidatePath } from "next/cache";
-
-const DEMO_USER = "demo";
 
 function normalizeName(value: string) {
   return value.trim().replace(/\s+/g, " ");
@@ -42,12 +41,12 @@ function decorateSessionExercise<
   };
 }
 
-async function ensureDemoUser() {
-  return prisma.user.upsert({
-    where: { id: DEMO_USER },
-    update: {},
-    create: { id: DEMO_USER },
-  });
+function revalidateWorkoutViews() {
+  revalidatePath("/dashboard");
+  revalidatePath("/log");
+  revalidatePath("/history");
+  revalidatePath("/plans");
+  revalidatePath("/progress");
 }
 
 async function ensureExerciseLibrary() {
@@ -71,6 +70,79 @@ async function ensureExerciseLibrary() {
   );
 }
 
+async function getActiveSessionForUser(userId: string) {
+  return prisma.workoutSession.findFirst({
+    where: { userId, isFinished: false },
+    orderBy: { createdAt: "desc" },
+  });
+}
+
+async function ensureSessionOwned(sessionId: string, userId: string) {
+  const session = await prisma.workoutSession.findFirst({
+    where: { id: sessionId, userId },
+  });
+
+  if (!session) {
+    throw new Error("Workout session not found");
+  }
+
+  return session;
+}
+
+async function ensureActiveSessionOwned(sessionId: string, userId: string) {
+  const session = await prisma.workoutSession.findFirst({
+    where: { id: sessionId, userId, isFinished: false },
+  });
+
+  if (!session) {
+    throw new Error("Active workout session not found");
+  }
+
+  return session;
+}
+
+async function getVisibleExercise(userId: string, exerciseId: string) {
+  const exercise = await prisma.exercise.findFirst({
+    where: {
+      id: exerciseId,
+      OR: [
+        { isLibrary: true },
+        { createdById: userId },
+        { sessions: { some: { session: { userId } } } },
+        { planEntries: { some: { plan: { userId } } } },
+      ],
+    },
+  });
+
+  if (!exercise) {
+    throw new Error("Exercise not found");
+  }
+
+  return exercise;
+}
+
+async function getVisibleExercises(userId: string, exerciseIds: string[]) {
+  const uniqueExerciseIds = Array.from(new Set(exerciseIds));
+
+  const exercises = await prisma.exercise.findMany({
+    where: {
+      id: { in: uniqueExerciseIds },
+      OR: [
+        { isLibrary: true },
+        { createdById: userId },
+        { sessions: { some: { session: { userId } } } },
+        { planEntries: { some: { plan: { userId } } } },
+      ],
+    },
+  });
+
+  if (exercises.length !== uniqueExerciseIds.length) {
+    throw new Error("One or more selected exercises are not available");
+  }
+
+  return exercises;
+}
+
 async function syncSessionExercise(sessionId: string, exerciseId: string) {
   const sessionExercise = await prisma.sessionExercise.upsert({
     where: {
@@ -87,9 +159,9 @@ async function syncSessionExercise(sessionId: string, exerciseId: string) {
   return decorateSessionExercise(sessionExercise);
 }
 
-async function getOrCreateActiveSession(name?: string | null) {
+async function getOrCreateActiveSession(userId: string, name?: string | null) {
   const normalizedName = name ? normalizeName(name) : "";
-  const existing = await getActiveSession();
+  const existing = await getActiveSessionForUser(userId);
 
   if (existing) {
     if (normalizedName && !existing.name) {
@@ -102,11 +174,9 @@ async function getOrCreateActiveSession(name?: string | null) {
     return existing;
   }
 
-  await ensureDemoUser();
-
   return prisma.workoutSession.create({
     data: {
-      userId: DEMO_USER,
+      userId,
       name: normalizedName || null,
     },
   });
@@ -116,13 +186,18 @@ async function addExercisesToSession(sessionId: string, exerciseIds: string[]) {
   const uniqueExerciseIds = Array.from(new Set(exerciseIds));
 
   await Promise.all(
-    uniqueExerciseIds.map((exerciseId) => syncSessionExercise(sessionId, exerciseId))
+    uniqueExerciseIds.map((exerciseId) =>
+      syncSessionExercise(sessionId, exerciseId)
+    )
   );
 }
 
-async function getOrCreateExerciseByName(name: string) {
+async function getOrCreateExerciseByName(userId: string, name: string) {
   const normalized = normalizeName(name);
-  if (!normalized) throw new Error("Exercise name cannot be empty");
+
+  if (!normalized) {
+    throw new Error("Exercise name cannot be empty");
+  }
 
   const libraryExercise = findLibraryExercise(normalized);
 
@@ -143,37 +218,51 @@ async function getOrCreateExerciseByName(name: string) {
     });
   }
 
-  return prisma.exercise.upsert({
+  const existingExercise = await prisma.exercise.findUnique({
     where: { name: normalized },
-    update: {},
-    create: { name: normalized },
   });
-}
 
-function revalidateWorkoutViews() {
-  revalidatePath("/");
-  revalidatePath("/log");
-  revalidatePath("/history");
-  revalidatePath("/plans");
+  if (existingExercise) {
+    if (
+      existingExercise.isLibrary ||
+      existingExercise.createdById === userId
+    ) {
+      return existingExercise;
+    }
+
+    throw new Error(
+      "That exercise name is already in use. Try a more specific custom name."
+    );
+  }
+
+  return prisma.exercise.create({
+    data: {
+      name: normalized,
+      createdById: userId,
+    },
+  });
 }
 
 // ─── Session ───────────────────────────────────────────────────────────────
 
 export async function getActiveSession() {
-  return prisma.workoutSession.findFirst({
-    where: { userId: DEMO_USER, isFinished: false },
-    orderBy: { createdAt: "desc" },
-  });
+  const viewer = await requireCurrentViewer();
+  return getActiveSessionForUser(viewer.id);
 }
 
 export async function startSession(name?: string | null): Promise<{ id: string }> {
-  const session = await getOrCreateActiveSession(name);
-  revalidatePath("/");
+  const viewer = await requireCurrentViewer();
+  const session = await getOrCreateActiveSession(viewer.id, name);
+
+  revalidatePath("/dashboard");
   revalidatePath("/log");
   return { id: session.id };
 }
 
 export async function finishSession(sessionId: string) {
+  const viewer = await requireCurrentViewer();
+  await ensureActiveSessionOwned(sessionId, viewer.id);
+
   await prisma.workoutSession.update({
     where: { id: sessionId },
     data: { isFinished: true },
@@ -183,8 +272,10 @@ export async function finishSession(sessionId: string) {
 }
 
 export async function listFinishedSessions() {
-  const sessions = await prisma.workoutSession.findMany({
-    where: { userId: DEMO_USER, isFinished: true },
+  const viewer = await requireCurrentViewer();
+
+  return prisma.workoutSession.findMany({
+    where: { userId: viewer.id, isFinished: true },
     orderBy: { date: "desc" },
     include: {
       exercises: {
@@ -195,13 +286,13 @@ export async function listFinishedSessions() {
       sets: true,
     },
   });
-
-  return sessions;
 }
 
 export async function getSessionDetails(sessionId: string) {
+  const viewer = await requireCurrentViewer();
+
   return prisma.workoutSession.findFirst({
-    where: { id: sessionId, userId: DEMO_USER, isFinished: true },
+    where: { id: sessionId, userId: viewer.id, isFinished: true },
     include: {
       exercises: {
         include: {
@@ -221,12 +312,19 @@ export async function getSessionDetails(sessionId: string) {
 // ─── Exercises ─────────────────────────────────────────────────────────────
 
 export async function upsertExerciseByName(name: string) {
+  const viewer = await requireCurrentViewer();
   await ensureExerciseLibrary();
-  return getOrCreateExerciseByName(name);
+  return getOrCreateExerciseByName(viewer.id, name);
 }
 
-export async function addExerciseToSession(sessionId: string, exerciseName: string) {
-  const exercise = await upsertExerciseByName(exerciseName);
+export async function addExerciseToSession(
+  sessionId: string,
+  exerciseName: string
+) {
+  const viewer = await requireCurrentViewer();
+  await ensureActiveSessionOwned(sessionId, viewer.id);
+
+  const exercise = await getOrCreateExerciseByName(viewer.id, exerciseName);
   const sessionExercise = await syncSessionExercise(sessionId, exercise.id);
 
   revalidatePath("/log");
@@ -237,13 +335,9 @@ export async function addExistingExerciseToSession(
   sessionId: string,
   exerciseId: string
 ) {
-  const exercise = await prisma.exercise.findUnique({
-    where: { id: exerciseId },
-  });
-
-  if (!exercise) {
-    throw new Error("Exercise not found");
-  }
+  const viewer = await requireCurrentViewer();
+  await ensureActiveSessionOwned(sessionId, viewer.id);
+  const exercise = await getVisibleExercise(viewer.id, exerciseId);
 
   const sessionExercise = await syncSessionExercise(sessionId, exercise.id);
 
@@ -255,10 +349,11 @@ export async function updateSessionExerciseNotes(
   sessionExerciseId: string,
   notes: string
 ) {
+  const viewer = await requireCurrentViewer();
   const sessionExercise = await prisma.sessionExercise.findFirst({
     where: {
       id: sessionExerciseId,
-      session: { userId: DEMO_USER },
+      session: { userId: viewer.id, isFinished: false },
     },
   });
 
@@ -281,6 +376,9 @@ export async function updateSessionExerciseNotes(
 }
 
 export async function listSessionExercises(sessionId: string) {
+  const viewer = await requireCurrentViewer();
+  await ensureSessionOwned(sessionId, viewer.id);
+
   const sessionExercises = await prisma.sessionExercise.findMany({
     where: { sessionId },
     include: { exercise: true },
@@ -291,9 +389,18 @@ export async function listSessionExercises(sessionId: string) {
 }
 
 export async function listAllExercises() {
+  const viewer = await requireCurrentViewer();
   await ensureExerciseLibrary();
 
   const exercises = await prisma.exercise.findMany({
+    where: {
+      OR: [
+        { isLibrary: true },
+        { createdById: viewer.id },
+        { sessions: { some: { session: { userId: viewer.id } } } },
+        { planEntries: { some: { plan: { userId: viewer.id } } } },
+      ],
+    },
     orderBy: [{ isLibrary: "desc" }, { category: "asc" }, { name: "asc" }],
   });
 
@@ -301,13 +408,14 @@ export async function listAllExercises() {
 }
 
 export async function listExercisesForUser() {
+  const viewer = await requireCurrentViewer();
   const sets = await prisma.setEntry.findMany({
-    where: { session: { userId: DEMO_USER } },
+    where: { session: { userId: viewer.id } },
     select: { exercise: true },
     distinct: ["exerciseId"],
   });
 
-  return sets.map((set) => set.exercise);
+  return sets.map((set) => decorateExercise(set.exercise));
 }
 
 // ─── Plans ─────────────────────────────────────────────────────────────────
@@ -318,10 +426,11 @@ export async function listBuiltInPlans() {
 }
 
 export async function listWorkoutPlans() {
+  const viewer = await requireCurrentViewer();
   await ensureExerciseLibrary();
 
   const plans = await prisma.workoutPlan.findMany({
-    where: { userId: DEMO_USER },
+    where: { userId: viewer.id },
     orderBy: { updatedAt: "desc" },
     include: {
       exercises: {
@@ -341,6 +450,7 @@ export async function listWorkoutPlans() {
 }
 
 export async function createWorkoutPlan(name: string, exerciseIds: string[]) {
+  const viewer = await requireCurrentViewer();
   const normalizedName = normalizeName(name);
 
   if (!normalizedName) {
@@ -355,13 +465,13 @@ export async function createWorkoutPlan(name: string, exerciseIds: string[]) {
     throw new Error("Select at least one exercise for the plan");
   }
 
-  await ensureDemoUser();
   await ensureExerciseLibrary();
+  await getVisibleExercises(viewer.id, uniqueExerciseIds);
 
   const plan = await prisma.workoutPlan.upsert({
     where: {
       userId_name: {
-        userId: DEMO_USER,
+        userId: viewer.id,
         name: normalizedName,
       },
     },
@@ -375,7 +485,7 @@ export async function createWorkoutPlan(name: string, exerciseIds: string[]) {
       },
     },
     create: {
-      userId: DEMO_USER,
+      userId: viewer.id,
       name: normalizedName,
       exercises: {
         create: uniqueExerciseIds.map((exerciseId, index) => ({
@@ -393,7 +503,7 @@ export async function createWorkoutPlan(name: string, exerciseIds: string[]) {
   });
 
   revalidatePath("/plans");
-  revalidatePath("/");
+  revalidatePath("/dashboard");
   return {
     ...plan,
     exercises: plan.exercises.map((entry) => ({
@@ -404,6 +514,7 @@ export async function createWorkoutPlan(name: string, exerciseIds: string[]) {
 }
 
 export async function startBuiltInPlan(planSlug: string) {
+  const viewer = await requireCurrentViewer();
   await ensureExerciseLibrary();
 
   const plan = findBuiltInPlan(planSlug);
@@ -412,10 +523,12 @@ export async function startBuiltInPlan(planSlug: string) {
   }
 
   const exercises = await Promise.all(
-    plan.exerciseNames.map((exerciseName) => getOrCreateExerciseByName(exerciseName))
+    plan.exerciseNames.map((exerciseName) =>
+      getOrCreateExerciseByName(viewer.id, exerciseName)
+    )
   );
 
-  const session = await getOrCreateActiveSession(plan.name);
+  const session = await getOrCreateActiveSession(viewer.id, plan.name);
   await addExercisesToSession(
     session.id,
     exercises.map((exercise) => exercise.id)
@@ -426,8 +539,9 @@ export async function startBuiltInPlan(planSlug: string) {
 }
 
 export async function startCustomPlan(planId: string) {
+  const viewer = await requireCurrentViewer();
   const plan = await prisma.workoutPlan.findFirst({
-    where: { id: planId, userId: DEMO_USER },
+    where: { id: planId, userId: viewer.id },
     include: {
       exercises: {
         orderBy: { sortOrder: "asc" },
@@ -439,7 +553,7 @@ export async function startCustomPlan(planId: string) {
     throw new Error("Plan not found");
   }
 
-  const session = await getOrCreateActiveSession(plan.name);
+  const session = await getOrCreateActiveSession(viewer.id, plan.name);
   await addExercisesToSession(
     session.id,
     plan.exercises.map((exercise) => exercise.exerciseId)
@@ -457,8 +571,13 @@ export async function addSet(
   weight: number,
   reps: number
 ) {
+  const viewer = await requireCurrentViewer();
+
   if (reps <= 0) throw new Error("Reps must be greater than 0");
   if (weight < 0) throw new Error("Weight cannot be negative");
+
+  await ensureActiveSessionOwned(sessionId, viewer.id);
+  await getVisibleExercise(viewer.id, exerciseId);
 
   const lastSet = await prisma.setEntry.findFirst({
     where: { sessionId, exerciseId },
@@ -476,11 +595,26 @@ export async function addSet(
 }
 
 export async function deleteSet(setId: string) {
+  const viewer = await requireCurrentViewer();
+  const setEntry = await prisma.setEntry.findFirst({
+    where: {
+      id: setId,
+      session: { userId: viewer.id, isFinished: false },
+    },
+  });
+
+  if (!setEntry) {
+    throw new Error("Set not found");
+  }
+
   await prisma.setEntry.delete({ where: { id: setId } });
   revalidatePath("/log");
 }
 
 export async function listSetsForSession(sessionId: string) {
+  const viewer = await requireCurrentViewer();
+  await ensureSessionOwned(sessionId, viewer.id);
+
   return prisma.setEntry.findMany({
     where: { sessionId },
     orderBy: [{ exerciseId: "asc" }, { setNumber: "asc" }],
@@ -491,10 +625,11 @@ export async function listSetsForSession(sessionId: string) {
 // ─── Progress ───────────────────────────────────────────────────────────────
 
 export async function getProgressForExercise(exerciseId: string) {
+  const viewer = await requireCurrentViewer();
   const sets = await prisma.setEntry.findMany({
     where: {
       exerciseId,
-      session: { userId: DEMO_USER, isFinished: true },
+      session: { userId: viewer.id, isFinished: true },
     },
     orderBy: { createdAt: "asc" },
     include: { session: { select: { date: true } } },
@@ -531,20 +666,21 @@ export async function getProgressForExercise(exerciseId: string) {
 // ─── Home stats ─────────────────────────────────────────────────────────────
 
 export async function getHomeStats() {
+  const viewer = await requireCurrentViewer();
   const now = new Date();
   const startOfWeek = new Date(now);
   startOfWeek.setDate(now.getDate() - now.getDay());
   startOfWeek.setHours(0, 0, 0, 0);
 
   const [activeSession, lastFinished, weekCount] = await Promise.all([
-    getActiveSession(),
+    getActiveSessionForUser(viewer.id),
     prisma.workoutSession.findFirst({
-      where: { userId: DEMO_USER, isFinished: true },
+      where: { userId: viewer.id, isFinished: true },
       orderBy: { date: "desc" },
     }),
     prisma.workoutSession.count({
       where: {
-        userId: DEMO_USER,
+        userId: viewer.id,
         isFinished: true,
         date: { gte: startOfWeek },
       },

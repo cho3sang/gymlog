@@ -8,6 +8,7 @@ import {
   startBuiltInPlan,
   startCustomPlan,
 } from "@/actions/workout";
+import { getCurrentViewer } from "@/lib/current-user";
 import { BUILT_IN_PLANS } from "@/lib/workoutData";
 
 export const dynamic = "force-dynamic";
@@ -39,6 +40,12 @@ async function handleStartCustomPlan(formData: FormData) {
 }
 
 export default async function PlansPage() {
+  const viewer = await getCurrentViewer();
+
+  if (!viewer) {
+    redirect("/");
+  }
+
   const [customPlans, exercises] = await Promise.all([
     listWorkoutPlans(),
     listAllExercises(),

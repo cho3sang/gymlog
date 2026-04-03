@@ -1,6 +1,6 @@
 // app/layout.tsx
 import "./globals.css";
-import Link from "next/link";
+import BottomNav from "@/components/BottomNav";
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -13,16 +13,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           {children}
         </div>
 
-        {/* bottom nav */}
-        <nav className="fixed bottom-0 left-0 right-0 border-t border-white/10 bg-black/70 backdrop-blur">
-          <div className="mx-auto flex max-w-md items-center justify-between px-4 py-3 text-sm text-white/70">
-            <Link className="hover:text-white" href="/">Home</Link>
-            <Link className="hover:text-white" href="/log">Log</Link>
-            <Link className="hover:text-white" href="/plans">Plans</Link>
-            <Link className="hover:text-white" href="/history">History</Link>
-            <Link className="hover:text-white" href="/progress">Progress</Link>
-          </div>
-        </nav>
+        <BottomNav />
       </body>
     </html>
   );

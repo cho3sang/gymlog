@@ -16,6 +16,8 @@
 
     "baseUrl": ".",
     "paths": {
+      "@/auth": ["./auth.ts"],
+      "@/auth.config": ["./auth.config.ts"],
       "@/*": ["./src/*"]
     }
   },

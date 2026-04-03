@@ -2,13 +2,13 @@
 
 GymLog is a mobile-first workout tracker for logging lifting sessions, reviewing workout history, and tracking exercise progress over time.
 
-It is built with Next.js, TypeScript, Prisma, and PostgreSQL, with a simple demo-user flow so you can run it locally without setting up auth first.
+It is built with Next.js, TypeScript, Prisma, and PostgreSQL, with account login and a guest mode so you can try the app quickly without sharing one global demo user.
 
 ## Live Demo
 
 [https://gymlog-seven.vercel.app](https://gymlog-seven.vercel.app)
 
-The live deployment is a shared public demo using the current demo-user flow, so it is best treated as a portfolio preview rather than a private personal tracker.
+The live deployment supports both account creation and guest sessions. It is still best treated as a portfolio demo rather than a place for sensitive personal data.
 
 ## Screenshots
 
@@ -22,6 +22,7 @@ The live deployment is a shared public demo using the current demo-user flow, so
 ## What It Demonstrates
 
 - Full-stack Next.js App Router architecture
+- Authentication with account creation and guest sessions
 - Server actions for write-heavy workout logging flows
 - Relational data modeling with Prisma and PostgreSQL
 - Mobile-first UI for fast in-session logging
@@ -30,6 +31,7 @@ The live deployment is a shared public demo using the current demo-user flow, so
 ## Features
 
 - Start and continue an active workout session
+- Create an account or continue as a guest from the landing page
 - Add exercises while you train
 - Pick from a built-in exercise library instead of typing every movement manually
 - Add a custom exercise if it does not exist in the library
@@ -58,13 +60,15 @@ The live deployment is a shared public demo using the current demo-user flow, so
 
 - Uses server actions for starting workouts, adding exercises, logging sets, saving notes, and creating plans
 - Models users, sessions, exercises, sets, session-specific notes, and workout plans with Prisma relations
+- Uses Auth.js credentials sessions for account login and isolated guest access
 - Seeds a reusable exercise library and built-in workout templates for a fast first-run experience
 - Keeps media simple with bundled SVG exercise visuals instead of third-party image APIs or paid services
 - Supports both structured library exercises and user-defined custom exercises in the same logging flow
+- Keeps user-created exercises tied to the account or guest session that created them
 
 ## Current Scope
 
-- This version uses a single demo user instead of full authentication
+- This version supports account login and guest access, but does not yet include advanced auth features like password reset or OAuth providers
 - Workout data is stored in PostgreSQL through Prisma
 - The app is strongest as a portfolio/demo project that shows full-stack implementation and product thinking
 
@@ -107,13 +111,14 @@ Default local database connection:
 
 ```env
 DATABASE_URL="postgresql://<your_user>@localhost:5432/gymlog"
+AUTH_SECRET="<generate-a-32-byte-secret>"
 ```
 
 Replace `<your_user>` with your macOS username.
 
 ## Run The App
 
-Apply the database schema and seed the demo user:
+Apply the database schema and seed the exercise library:
 
 ```bash
 npx prisma migrate dev --name init
@@ -154,7 +159,7 @@ If you want it to feel more app-like, add it to your home screen from Safari or 
 
 ## Project Notes
 
-- The current app uses a hardcoded demo user instead of authentication.
+- The app supports both accounts and guest sessions.
 - Workout data is stored in PostgreSQL through Prisma.
 - Prisma migrations are stored in `prisma/migrations`.
 

@@ -7,6 +7,7 @@ import {
   startSession,
 } from "@/actions/workout";
 import PageHeader from "@/components/PageHeader";
+import { getCurrentViewer } from "@/lib/current-user";
 import ActiveWorkout from "./ActiveWorkout";
 import { redirect } from "next/navigation";
 
@@ -19,6 +20,12 @@ async function handleStart() {
 }
 
 export default async function LogPage() {
+  const viewer = await getCurrentViewer();
+
+  if (!viewer) {
+    redirect("/");
+  }
+
   const session = await getActiveSession();
 
   if (!session) {
