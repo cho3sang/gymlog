@@ -129,11 +129,28 @@ export default async function HistoryDetailPage({
                   <h2 className="font-semibold text-white">
                     {sessionExercise.exercise.name}
                   </h2>
+                  {sessionExercise.exercise.description && (
+                    <p className="text-xs text-[#666] mt-1">
+                      {sessionExercise.exercise.description}
+                    </p>
+                  )}
                   <p className="text-xs text-[#666] mt-0.5">
                     {exerciseSets.length} set
                     {exerciseSets.length !== 1 ? "s" : ""}
                   </p>
                 </div>
+
+                {sessionExercise.notes && (
+                  <div
+                    className="px-4 py-3"
+                    style={{ borderBottom: "1px solid #1f1f1f" }}
+                  >
+                    <p className="text-[10px] text-[#666] uppercase tracking-widest mb-1">
+                      Notes
+                    </p>
+                    <p className="text-sm text-[#d0d0d0]">{sessionExercise.notes}</p>
+                  </div>
+                )}
 
                 {exerciseSets.length > 0 ? (
                   <table className="w-full text-sm">

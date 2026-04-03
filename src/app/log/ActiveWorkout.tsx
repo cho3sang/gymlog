@@ -1,18 +1,32 @@
 "use client";
 
-// src/app/log/ActiveWorkout.tsx
-import { useCallback, useRef, useState, useTransition } from "react";
+import Link from "next/link";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import {
+  addExistingExerciseToSession,
   addExerciseToSession,
   addSet,
   deleteSet,
   finishSession,
+  updateSessionExerciseNotes,
 } from "@/actions/workout";
 
 interface Exercise {
   id: string;
+  sessionExerciseId: string;
   name: string;
+  description: string | null;
+  category: string | null;
+  notes: string | null;
+}
+
+interface LibraryExercise {
+  id: string;
+  name: string;
+  description: string | null;
+  category: string | null;
+  isLibrary: boolean;
 }
 
 interface SetRow {
@@ -27,26 +41,65 @@ interface Props {
   session: { id: string; date: Date; isFinished: boolean };
   initialExercises: Exercise[];
   initialSets: SetRow[];
+  libraryExercises: LibraryExercise[];
 }
 
 export default function ActiveWorkout({
   session,
   initialExercises,
   initialSets,
+  libraryExercises,
 }: Props) {
   const router = useRouter();
   const [exercises, setExercises] = useState<Exercise[]>(initialExercises);
   const [sets, setSets] = useState<SetRow[]>(initialSets);
   const [exerciseSearch, setExerciseSearch] = useState("");
-  const [addingExercise, setAddingExercise] = useState(false);
+  const [addingExerciseKey, setAddingExerciseKey] = useState("");
   const [error, setError] = useState("");
   const [finishing, setFinishing] = useState(false);
-  const [isPending, startTransition] = useTransition();
+  const [savingNotesId, setSavingNotesId] = useState("");
+  const [noteStatus, setNoteStatus] = useState<Record<string, string>>(
+    Object.fromEntries(
+      initialExercises.map((exercise) => [exercise.sessionExerciseId, ""])
+    )
+  );
 
-  // Per-exercise weight/reps inputs
   const [setInputs, setSetInputs] = useState<
     Record<string, { weight: string; reps: string; error: string }>
   >({});
+  const [exerciseNotes, setExerciseNotes] = useState<Record<string, string>>(
+    Object.fromEntries(
+      initialExercises.map((exercise) => [
+        exercise.sessionExerciseId,
+        exercise.notes ?? "",
+      ])
+    )
+  );
+
+  const currentExerciseIds = new Set(exercises.map((exercise) => exercise.id));
+  const availableExercises = libraryExercises.filter(
+    (exercise) => !currentExerciseIds.has(exercise.id)
+  );
+
+  const normalizedSearch = exerciseSearch.trim().toLowerCase();
+  const matchingExercises = normalizedSearch
+    ? availableExercises.filter((exercise) => {
+        const nameMatch = exercise.name.toLowerCase().includes(normalizedSearch);
+        const descriptionMatch = exercise.description
+          ?.toLowerCase()
+          .includes(normalizedSearch);
+        const categoryMatch = exercise.category
+          ?.toLowerCase()
+          .includes(normalizedSearch);
+
+        return nameMatch || descriptionMatch || categoryMatch;
+      })
+    : [];
+
+  const quickPickExercises = availableExercises.slice(0, 8);
+  const hasExactMatch = availableExercises.some(
+    (exercise) => exercise.name.toLowerCase() === normalizedSearch
+  );
 
   const getInput = (exerciseId: string) =>
     setInputs[exerciseId] ?? { weight: "", reps: "", error: "" };
@@ -62,22 +115,82 @@ export default function ActiveWorkout({
     }));
   };
 
-  const handleAddExercise = async () => {
+  const insertExercise = (sessionExercise: {
+    id: string;
+    notes: string | null;
+    exercise: {
+      id: string;
+      name: string;
+      description: string | null;
+      category: string | null;
+    };
+  }) => {
+    setExercises((prev) => {
+      if (prev.some((exercise) => exercise.id === sessionExercise.exercise.id)) {
+        return prev;
+      }
+
+      return [
+        ...prev,
+        {
+          id: sessionExercise.exercise.id,
+          sessionExerciseId: sessionExercise.id,
+          name: sessionExercise.exercise.name,
+          description: sessionExercise.exercise.description,
+          category: sessionExercise.exercise.category,
+          notes: sessionExercise.notes,
+        },
+      ];
+    });
+
+    setExerciseNotes((prev) => ({
+      ...prev,
+      [sessionExercise.id]: sessionExercise.notes ?? "",
+    }));
+    setNoteStatus((prev) => ({
+      ...prev,
+      [sessionExercise.id]: "",
+    }));
+  };
+
+  const handleAddExistingExercise = async (
+    exerciseId: string,
+    displayName: string
+  ) => {
+    setAddingExerciseKey(exerciseId);
+    setError("");
+
+    try {
+      const sessionExercise = await addExistingExerciseToSession(
+        session.id,
+        exerciseId
+      );
+      insertExercise(sessionExercise);
+      setExerciseSearch("");
+    } catch (e: unknown) {
+      setError(
+        e instanceof Error ? e.message : `Failed to add ${displayName}`
+      );
+    } finally {
+      setAddingExerciseKey("");
+    }
+  };
+
+  const handleAddCustomExercise = async () => {
     const name = exerciseSearch.trim();
     if (!name) return;
-    setAddingExercise(true);
+
+    setAddingExerciseKey(`custom:${name}`);
     setError("");
+
     try {
-      const exercise = await addExerciseToSession(session.id, name);
-      setExercises((prev) => {
-        if (prev.find((e) => e.id === exercise.id)) return prev;
-        return [...prev, { id: exercise.id, name: exercise.name }];
-      });
+      const sessionExercise = await addExerciseToSession(session.id, name);
+      insertExercise(sessionExercise);
       setExerciseSearch("");
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : "Failed to add exercise");
     } finally {
-      setAddingExercise(false);
+      setAddingExerciseKey("");
     }
   };
 
@@ -93,6 +206,7 @@ export default function ActiveWorkout({
       }));
       return;
     }
+
     if (isNaN(weight) || weight < 0) {
       setSetInputs((prev) => ({
         ...prev,
@@ -129,8 +243,41 @@ export default function ActiveWorkout({
   };
 
   const handleDeleteSet = async (setId: string) => {
-    setSets((prev) => prev.filter((s) => s.id !== setId));
+    setSets((prev) => prev.filter((set) => set.id !== setId));
     await deleteSet(setId);
+  };
+
+  const handleSaveNotes = async (sessionExerciseId: string) => {
+    setSavingNotesId(sessionExerciseId);
+    setNoteStatus((prev) => ({ ...prev, [sessionExerciseId]: "" }));
+
+    try {
+      const updated = await updateSessionExerciseNotes(
+        sessionExerciseId,
+        exerciseNotes[sessionExerciseId] ?? ""
+      );
+
+      setExercises((prev) =>
+        prev.map((exercise) =>
+          exercise.sessionExerciseId === sessionExerciseId
+            ? { ...exercise, notes: updated.notes }
+            : exercise
+        )
+      );
+      setExerciseNotes((prev) => ({
+        ...prev,
+        [sessionExerciseId]: updated.notes ?? "",
+      }));
+      setNoteStatus((prev) => ({ ...prev, [sessionExerciseId]: "Saved" }));
+    } catch (e: unknown) {
+      setNoteStatus((prev) => ({
+        ...prev,
+        [sessionExerciseId]:
+          e instanceof Error ? e.message : "Could not save notes",
+      }));
+    } finally {
+      setSavingNotesId("");
+    }
   };
 
   const handleFinish = async () => {
@@ -141,67 +288,217 @@ export default function ActiveWorkout({
   };
 
   const setsForExercise = (exerciseId: string) =>
-    sets.filter((s) => s.exerciseId === exerciseId);
+    sets.filter((set) => set.exerciseId === exerciseId);
 
   return (
     <div className="px-5 space-y-4">
-      {/* Add Exercise */}
       <div
-        className="rounded-2xl p-4"
+        className="rounded-2xl p-4 space-y-3"
         style={{ backgroundColor: "#111111", border: "1px solid #1f1f1f" }}
       >
-        <p className="text-xs text-[#666] uppercase tracking-widest mb-3">
-          Add Exercise
-        </p>
-        <div className="flex gap-2">
-          <input
-            type="text"
-            value={exerciseSearch}
-            onChange={(e) => setExerciseSearch(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && handleAddExercise()}
-            placeholder="e.g. Bench Press"
-            className="flex-1 bg-[#1a1a1a] border border-[#2e2e2e] rounded-xl px-4 py-3 text-sm text-white placeholder-[#444] focus:border-[#c8ff00] focus:outline-none"
-          />
-          <button
-            onClick={handleAddExercise}
-            disabled={addingExercise || !exerciseSearch.trim()}
-            className="px-5 py-3 rounded-xl font-semibold text-sm text-black disabled:opacity-40"
-            style={{ backgroundColor: "#c8ff00" }}
-          >
-            {addingExercise ? "…" : "Add"}
-          </button>
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <p className="text-xs text-[#666] uppercase tracking-widest">
+              Exercise Library
+            </p>
+            <p className="text-sm text-[#555] mt-1">
+              Pick from your library or add a custom movement for this workout.
+            </p>
+          </div>
+          <Link href="/plans" className="text-xs text-[#c8ff00]">
+            Plans
+          </Link>
         </div>
-        {error && <p className="text-xs text-red-400 mt-2">{error}</p>}
+
+        <input
+          type="text"
+          value={exerciseSearch}
+          onChange={(e) => setExerciseSearch(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && normalizedSearch && !hasExactMatch) {
+              e.preventDefault();
+              handleAddCustomExercise();
+            }
+          }}
+          placeholder="Search bench, squat, row..."
+          className="w-full bg-[#1a1a1a] border border-[#2e2e2e] rounded-xl px-4 py-3 text-sm text-white placeholder-[#444] focus:border-[#c8ff00] focus:outline-none"
+        />
+
+        {normalizedSearch ? (
+          <div className="space-y-2">
+            {matchingExercises.length > 0 ? (
+              matchingExercises.slice(0, 6).map((exercise) => (
+                <button
+                  key={exercise.id}
+                  onClick={() =>
+                    handleAddExistingExercise(exercise.id, exercise.name)
+                  }
+                  disabled={addingExerciseKey === exercise.id}
+                  className="w-full text-left rounded-xl px-4 py-3 border disabled:opacity-50"
+                  style={{
+                    backgroundColor: "#151515",
+                    borderColor: "#252525",
+                  }}
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="text-sm font-semibold text-white">
+                        {exercise.name}
+                      </p>
+                      {exercise.description && (
+                        <p className="text-xs text-[#666] mt-1">
+                          {exercise.description}
+                        </p>
+                      )}
+                    </div>
+                    <span className="text-[10px] uppercase tracking-wider text-[#c8ff00]">
+                      {addingExerciseKey === exercise.id ? "Adding" : "Add"}
+                    </span>
+                  </div>
+                </button>
+              ))
+            ) : (
+              <p className="text-sm text-[#555]">
+                No library matches for &quot;{exerciseSearch.trim()}&quot;.
+              </p>
+            )}
+
+            {!hasExactMatch && (
+              <button
+                onClick={handleAddCustomExercise}
+                disabled={addingExerciseKey === `custom:${exerciseSearch.trim()}`}
+                className="w-full rounded-xl px-4 py-3 text-left font-semibold text-black disabled:opacity-50"
+                style={{ backgroundColor: "#c8ff00" }}
+              >
+                {addingExerciseKey === `custom:${exerciseSearch.trim()}`
+                  ? "Adding custom exercise…"
+                  : `Add "${exerciseSearch.trim()}" as a custom exercise`}
+              </button>
+            )}
+          </div>
+        ) : (
+          <div className="space-y-2">
+            <p className="text-xs text-[#666] uppercase tracking-widest">
+              Quick Picks
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {quickPickExercises.map((exercise) => (
+                <button
+                  key={exercise.id}
+                  onClick={() =>
+                    handleAddExistingExercise(exercise.id, exercise.name)
+                  }
+                  disabled={addingExerciseKey === exercise.id}
+                  className="px-3 py-2 rounded-full text-xs border disabled:opacity-50"
+                  style={{
+                    borderColor: "#2a2a2a",
+                    backgroundColor: "#181818",
+                    color: "#f0f0f0",
+                  }}
+                >
+                  {addingExerciseKey === exercise.id ? "Adding…" : exercise.name}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {error && <p className="text-xs text-red-400">{error}</p>}
       </div>
 
-      {/* Exercise Cards */}
       {exercises.length === 0 ? (
         <div className="text-center py-12 text-[#444]">
-          <p className="text-4xl mb-3" style={{ fontFamily: "'Bebas Neue', sans-serif" }}>No exercises yet</p>
-          <p className="text-sm">Add an exercise above to get started</p>
+          <p
+            className="text-4xl mb-3"
+            style={{ fontFamily: "'Bebas Neue', sans-serif" }}
+          >
+            No exercises yet
+          </p>
+          <p className="text-sm">
+            Start with a quick pick, search the library, or add your own.
+          </p>
         </div>
       ) : (
         exercises.map((exercise) => {
           const exSets = setsForExercise(exercise.id);
           const input = getInput(exercise.id);
+          const notesValue = exerciseNotes[exercise.sessionExerciseId] ?? "";
+          const notesStatus = noteStatus[exercise.sessionExerciseId] ?? "";
+
           return (
             <div
               key={exercise.id}
               className="rounded-2xl overflow-hidden"
               style={{ backgroundColor: "#111111", border: "1px solid #1f1f1f" }}
             >
-              {/* Exercise header */}
               <div
                 className="px-4 py-3"
                 style={{ borderBottom: "1px solid #1f1f1f" }}
               >
-                <h3 className="font-semibold text-white">{exercise.name}</h3>
-                <p className="text-xs text-[#666]">
-                  {exSets.length} set{exSets.length !== 1 ? "s" : ""}
-                </p>
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <h3 className="font-semibold text-white">{exercise.name}</h3>
+                    {exercise.description && (
+                      <p className="text-xs text-[#666] mt-1">
+                        {exercise.description}
+                      </p>
+                    )}
+                    <p className="text-xs text-[#666] mt-1">
+                      {exSets.length} set{exSets.length !== 1 ? "s" : ""}
+                      {exercise.category ? ` • ${exercise.category}` : ""}
+                    </p>
+                  </div>
+                </div>
               </div>
 
-              {/* Sets table */}
+              <div
+                className="px-4 py-3 space-y-2"
+                style={{ borderBottom: "1px solid #1f1f1f" }}
+              >
+                <div className="flex items-center justify-between gap-3">
+                  <label className="text-[10px] text-[#666] uppercase tracking-widest">
+                    Notes
+                  </label>
+                  {notesStatus && (
+                    <p
+                      className={`text-[10px] uppercase tracking-widest ${
+                        notesStatus === "Saved"
+                          ? "text-[#c8ff00]"
+                          : "text-red-400"
+                      }`}
+                    >
+                      {notesStatus}
+                    </p>
+                  )}
+                </div>
+                <textarea
+                  value={notesValue}
+                  onChange={(e) => {
+                    setExerciseNotes((prev) => ({
+                      ...prev,
+                      [exercise.sessionExerciseId]: e.target.value,
+                    }));
+                    setNoteStatus((prev) => ({
+                      ...prev,
+                      [exercise.sessionExerciseId]: "",
+                    }));
+                  }}
+                  placeholder="Optional notes, cues, machine settings..."
+                  rows={2}
+                  className="w-full resize-none bg-[#1a1a1a] border border-[#2e2e2e] rounded-xl px-3 py-2.5 text-sm text-white placeholder-[#444] focus:border-[#c8ff00] focus:outline-none"
+                />
+                <button
+                  onClick={() => handleSaveNotes(exercise.sessionExerciseId)}
+                  disabled={savingNotesId === exercise.sessionExerciseId}
+                  className="px-4 py-2 rounded-lg text-xs font-semibold text-black disabled:opacity-50"
+                  style={{ backgroundColor: "#c8ff00" }}
+                >
+                  {savingNotesId === exercise.sessionExerciseId
+                    ? "Saving…"
+                    : "Save Notes"}
+                </button>
+              </div>
+
               {exSets.length > 0 && (
                 <div className="px-4 py-2">
                   <table className="w-full text-sm">
@@ -214,26 +511,24 @@ export default function ActiveWorkout({
                       </tr>
                     </thead>
                     <tbody>
-                      {exSets.map((s) => (
+                      {exSets.map((set) => (
                         <tr
-                          key={s.id}
+                          key={set.id}
                           className="border-t"
                           style={{ borderColor: "#1f1f1f" }}
                         >
-                          <td
-                            className="py-2 text-[#c8ff00] font-mono text-xs"
-                          >
-                            {s.setNumber}
+                          <td className="py-2 text-[#c8ff00] font-mono text-xs">
+                            {set.setNumber}
                           </td>
                           <td className="py-2 text-right font-mono text-white">
-                            {s.weight}
+                            {set.weight}
                           </td>
                           <td className="py-2 text-right font-mono text-white">
-                            {s.reps}
+                            {set.reps}
                           </td>
                           <td className="py-2 text-right">
                             <button
-                              onClick={() => handleDeleteSet(s.id)}
+                              onClick={() => handleDeleteSet(set.id)}
                               className="text-[#444] hover:text-red-400 transition-colors pl-3"
                               title="Delete set"
                             >
@@ -247,10 +542,11 @@ export default function ActiveWorkout({
                 </div>
               )}
 
-              {/* Add set form */}
               <div
                 className="px-4 py-3"
-                style={{ borderTop: exSets.length ? "1px solid #1f1f1f" : undefined }}
+                style={{
+                  borderTop: exSets.length ? "1px solid #1f1f1f" : undefined,
+                }}
               >
                 <div className="flex gap-2 items-end">
                   <div className="flex-1">
@@ -270,6 +566,7 @@ export default function ActiveWorkout({
                       className="w-full bg-[#1a1a1a] border border-[#2e2e2e] rounded-lg px-3 py-2.5 text-sm text-white font-mono focus:border-[#c8ff00] focus:outline-none"
                     />
                   </div>
+
                   <div className="flex-1">
                     <label className="text-[10px] text-[#666] uppercase tracking-widest block mb-1">
                       Reps
@@ -289,6 +586,7 @@ export default function ActiveWorkout({
                       className="w-full bg-[#1a1a1a] border border-[#2e2e2e] rounded-lg px-3 py-2.5 text-sm text-white font-mono focus:border-[#c8ff00] focus:outline-none"
                     />
                   </div>
+
                   <button
                     onClick={() => handleAddSet(exercise.id)}
                     className="pb-0.5 w-12 h-10 rounded-lg text-black font-bold text-lg flex items-center justify-center flex-shrink-0"
@@ -297,6 +595,7 @@ export default function ActiveWorkout({
                     +
                   </button>
                 </div>
+
                 {input.error && (
                   <p className="text-xs text-red-400 mt-1.5">{input.error}</p>
                 )}
@@ -306,7 +605,6 @@ export default function ActiveWorkout({
         })
       )}
 
-      {/* Finish Workout */}
       {exercises.length > 0 && (
         <div className="pt-2 pb-4">
           <button
