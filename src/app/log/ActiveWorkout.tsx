@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import ExerciseVisual from "@/components/ExerciseVisual";
 import {
   addExistingExerciseToSession,
   addExerciseToSession,
@@ -18,6 +19,12 @@ interface Exercise {
   name: string;
   description: string | null;
   category: string | null;
+  equipment: string | null;
+  primaryMuscles: string[];
+  coachingCues: string[];
+  visualPath: string;
+  accentColor: string;
+  accentSoft: string;
   notes: string | null;
 }
 
@@ -26,6 +33,12 @@ interface LibraryExercise {
   name: string;
   description: string | null;
   category: string | null;
+  equipment: string | null;
+  primaryMuscles: string[];
+  coachingCues: string[];
+  visualPath: string;
+  accentColor: string;
+  accentSoft: string;
   isLibrary: boolean;
 }
 
@@ -91,8 +104,20 @@ export default function ActiveWorkout({
         const categoryMatch = exercise.category
           ?.toLowerCase()
           .includes(normalizedSearch);
+        const equipmentMatch = exercise.equipment
+          ?.toLowerCase()
+          .includes(normalizedSearch);
+        const muscleMatch = exercise.primaryMuscles.some((muscle) =>
+          muscle.toLowerCase().includes(normalizedSearch)
+        );
 
-        return nameMatch || descriptionMatch || categoryMatch;
+        return (
+          nameMatch ||
+          descriptionMatch ||
+          categoryMatch ||
+          equipmentMatch ||
+          muscleMatch
+        );
       })
     : [];
 
@@ -123,6 +148,12 @@ export default function ActiveWorkout({
       name: string;
       description: string | null;
       category: string | null;
+      equipment: string | null;
+      primaryMuscles: string[];
+      coachingCues: string[];
+      visualPath: string;
+      accentColor: string;
+      accentSoft: string;
     };
   }) => {
     setExercises((prev) => {
@@ -138,6 +169,12 @@ export default function ActiveWorkout({
           name: sessionExercise.exercise.name,
           description: sessionExercise.exercise.description,
           category: sessionExercise.exercise.category,
+          equipment: sessionExercise.exercise.equipment,
+          primaryMuscles: sessionExercise.exercise.primaryMuscles,
+          coachingCues: sessionExercise.exercise.coachingCues,
+          visualPath: sessionExercise.exercise.visualPath,
+          accentColor: sessionExercise.exercise.accentColor,
+          accentSoft: sessionExercise.exercise.accentSoft,
           notes: sessionExercise.notes,
         },
       ];
@@ -302,7 +339,8 @@ export default function ActiveWorkout({
               Exercise Library
             </p>
             <p className="text-sm text-[#555] mt-1">
-              Pick from your library or add a custom movement for this workout.
+              Pick from the built-in library or add a custom movement if yours
+              is not listed.
             </p>
           </div>
           <Link href="/plans" className="text-xs text-[#c8ff00]">
@@ -340,20 +378,67 @@ export default function ActiveWorkout({
                     borderColor: "#252525",
                   }}
                 >
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <p className="text-sm font-semibold text-white">
-                        {exercise.name}
-                      </p>
-                      {exercise.description && (
-                        <p className="text-xs text-[#666] mt-1">
-                          {exercise.description}
+                  <div className="flex items-start gap-3">
+                    <div className="w-16 shrink-0">
+                      <ExerciseVisual
+                        name={exercise.name}
+                        category={exercise.category}
+                        visualPath={exercise.visualPath}
+                        accentColor={exercise.accentColor}
+                        accentSoft={exercise.accentSoft}
+                        size="sm"
+                      />
+                    </div>
+
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="text-sm font-semibold text-white">
+                            {exercise.name}
+                          </p>
+                          {exercise.description && (
+                            <p className="text-xs text-[#666] mt-1">
+                              {exercise.description}
+                            </p>
+                          )}
+                        </div>
+                        <span className="text-[10px] uppercase tracking-wider text-[#c8ff00]">
+                          {addingExerciseKey === exercise.id ? "Adding" : "Add"}
+                        </span>
+                      </div>
+
+                      <div className="flex flex-wrap gap-2 mt-2">
+                        {exercise.equipment && (
+                          <span
+                            className="px-2 py-1 rounded-full text-[10px]"
+                            style={{
+                              backgroundColor: "#1d1d1d",
+                              color: "#adadad",
+                            }}
+                          >
+                            {exercise.equipment}
+                          </span>
+                        )}
+                        {exercise.primaryMuscles.slice(0, 2).map((muscle) => (
+                          <span
+                            key={muscle}
+                            className="px-2 py-1 rounded-full text-[10px]"
+                            style={{
+                              backgroundColor: exercise.accentSoft,
+                              color: "#f0f0f0",
+                            }}
+                          >
+                            {muscle}
+                          </span>
+                        ))}
+                      </div>
+
+                      {exercise.coachingCues[0] && (
+                        <p className="text-[11px] text-[#777] mt-2">
+                          Cue: {exercise.coachingCues[0]}
                         </p>
                       )}
                     </div>
-                    <span className="text-[10px] uppercase tracking-wider text-[#c8ff00]">
-                      {addingExerciseKey === exercise.id ? "Adding" : "Add"}
-                    </span>
                   </div>
                 </button>
               ))
@@ -400,6 +485,10 @@ export default function ActiveWorkout({
                 </button>
               ))}
             </div>
+            <p className="text-xs text-[#555]">
+              Visuals are bundled into the app, so there are no external media
+              accounts or paid APIs to set up.
+            </p>
           </div>
         )}
 
@@ -435,7 +524,15 @@ export default function ActiveWorkout({
                 className="px-4 py-3"
                 style={{ borderBottom: "1px solid #1f1f1f" }}
               >
-                <div className="flex items-start justify-between gap-3">
+                <div className="grid grid-cols-[88px_1fr] gap-3 items-start">
+                  <ExerciseVisual
+                    name={exercise.name}
+                    category={exercise.category}
+                    visualPath={exercise.visualPath}
+                    accentColor={exercise.accentColor}
+                    accentSoft={exercise.accentSoft}
+                  />
+
                   <div>
                     <h3 className="font-semibold text-white">{exercise.name}</h3>
                     {exercise.description && (
@@ -447,6 +544,38 @@ export default function ActiveWorkout({
                       {exSets.length} set{exSets.length !== 1 ? "s" : ""}
                       {exercise.category ? ` • ${exercise.category}` : ""}
                     </p>
+
+                    <div className="flex flex-wrap gap-2 mt-3">
+                      {exercise.equipment && (
+                        <span
+                          className="px-2.5 py-1 rounded-full text-[10px]"
+                          style={{
+                            backgroundColor: "#1d1d1d",
+                            color: "#d0d0d0",
+                          }}
+                        >
+                          {exercise.equipment}
+                        </span>
+                      )}
+                      {exercise.primaryMuscles.slice(0, 3).map((muscle) => (
+                        <span
+                          key={muscle}
+                          className="px-2.5 py-1 rounded-full text-[10px]"
+                          style={{
+                            backgroundColor: exercise.accentSoft,
+                            color: "#f3f3f3",
+                          }}
+                        >
+                          {muscle}
+                        </span>
+                      ))}
+                    </div>
+
+                    {exercise.coachingCues.length > 0 && (
+                      <p className="text-[11px] text-[#777] mt-3">
+                        {exercise.coachingCues.slice(0, 2).join(" • ")}
+                      </p>
+                    )}
                   </div>
                 </div>
               </div>

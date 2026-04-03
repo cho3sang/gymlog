@@ -71,6 +71,12 @@ export default async function LogPage() {
           name: sessionExercise.exercise.name,
           description: sessionExercise.exercise.description,
           category: sessionExercise.exercise.category,
+          equipment: sessionExercise.exercise.equipment,
+          primaryMuscles: sessionExercise.exercise.primaryMuscles,
+          coachingCues: sessionExercise.exercise.coachingCues,
+          visualPath: sessionExercise.exercise.visualPath,
+          accentColor: sessionExercise.exercise.accentColor,
+          accentSoft: sessionExercise.exercise.accentSoft,
           notes: sessionExercise.notes,
         }))}
         initialSets={allSets.map((set) => ({
@@ -85,6 +91,12 @@ export default async function LogPage() {
           name: exercise.name,
           description: exercise.description,
           category: exercise.category,
+          equipment: exercise.equipment,
+          primaryMuscles: exercise.primaryMuscles,
+          coachingCues: exercise.coachingCues,
+          visualPath: exercise.visualPath,
+          accentColor: exercise.accentColor,
+          accentSoft: exercise.accentSoft,
           isLibrary: exercise.isLibrary,
         }))}
       />

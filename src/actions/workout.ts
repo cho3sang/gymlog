@@ -6,6 +6,7 @@ import {
   EXERCISE_LIBRARY,
   findBuiltInPlan,
   findLibraryExercise,
+  getExerciseLibraryDetails,
 } from "@/lib/workoutData";
 import { revalidatePath } from "next/cache";
 
@@ -13,6 +14,32 @@ const DEMO_USER = "demo";
 
 function normalizeName(value: string) {
   return value.trim().replace(/\s+/g, " ");
+}
+
+function decorateExercise<T extends {
+  name: string;
+  category: string | null;
+  description: string | null;
+}>(exercise: T) {
+  return {
+    ...exercise,
+    ...getExerciseLibraryDetails(exercise),
+  };
+}
+
+function decorateSessionExercise<
+  T extends {
+    exercise: {
+      name: string;
+      category: string | null;
+      description: string | null;
+    };
+  },
+>(sessionExercise: T) {
+  return {
+    ...sessionExercise,
+    exercise: decorateExercise(sessionExercise.exercise),
+  };
 }
 
 async function ensureDemoUser() {
@@ -45,7 +72,7 @@ async function ensureExerciseLibrary() {
 }
 
 async function syncSessionExercise(sessionId: string, exerciseId: string) {
-  return prisma.sessionExercise.upsert({
+  const sessionExercise = await prisma.sessionExercise.upsert({
     where: {
       sessionId_exerciseId: {
         sessionId,
@@ -56,6 +83,8 @@ async function syncSessionExercise(sessionId: string, exerciseId: string) {
     create: { sessionId, exerciseId },
     include: { exercise: true },
   });
+
+  return decorateSessionExercise(sessionExercise);
 }
 
 async function getOrCreateActiveSession(name?: string | null) {
@@ -252,19 +281,23 @@ export async function updateSessionExerciseNotes(
 }
 
 export async function listSessionExercises(sessionId: string) {
-  return prisma.sessionExercise.findMany({
+  const sessionExercises = await prisma.sessionExercise.findMany({
     where: { sessionId },
     include: { exercise: true },
     orderBy: { id: "asc" },
   });
+
+  return sessionExercises.map(decorateSessionExercise);
 }
 
 export async function listAllExercises() {
   await ensureExerciseLibrary();
 
-  return prisma.exercise.findMany({
+  const exercises = await prisma.exercise.findMany({
     orderBy: [{ isLibrary: "desc" }, { category: "asc" }, { name: "asc" }],
   });
+
+  return exercises.map(decorateExercise);
 }
 
 export async function listExercisesForUser() {
@@ -287,7 +320,7 @@ export async function listBuiltInPlans() {
 export async function listWorkoutPlans() {
   await ensureExerciseLibrary();
 
-  return prisma.workoutPlan.findMany({
+  const plans = await prisma.workoutPlan.findMany({
     where: { userId: DEMO_USER },
     orderBy: { updatedAt: "desc" },
     include: {
@@ -297,6 +330,14 @@ export async function listWorkoutPlans() {
       },
     },
   });
+
+  return plans.map((plan) => ({
+    ...plan,
+    exercises: plan.exercises.map((entry) => ({
+      ...entry,
+      exercise: decorateExercise(entry.exercise),
+    })),
+  }));
 }
 
 export async function createWorkoutPlan(name: string, exerciseIds: string[]) {
@@ -353,7 +394,13 @@ export async function createWorkoutPlan(name: string, exerciseIds: string[]) {
 
   revalidatePath("/plans");
   revalidatePath("/");
-  return plan;
+  return {
+    ...plan,
+    exercises: plan.exercises.map((entry) => ({
+      ...entry,
+      exercise: decorateExercise(entry.exercise),
+    })),
+  };
 }
 
 export async function startBuiltInPlan(planSlug: string) {

@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import PageHeader from "@/components/PageHeader";
+import ExerciseVisual from "@/components/ExerciseVisual";
 import {
   createWorkoutPlan,
   listAllExercises,
@@ -42,6 +43,9 @@ export default async function PlansPage() {
     listWorkoutPlans(),
     listAllExercises(),
   ]);
+  const exerciseByName = Object.fromEntries(
+    exercises.map((exercise) => [exercise.name, exercise])
+  );
 
   const groupedExercises = exercises.reduce<
     Record<string, typeof exercises>
@@ -70,6 +74,8 @@ export default async function PlansPage() {
             </p>
             <p className="text-sm text-[#555] mt-1">
               Start with a simple template and adjust inside the workout screen.
+              Everything here uses bundled visuals and local exercise metadata,
+              so there is nothing extra to sign up for.
             </p>
           </div>
 
@@ -79,26 +85,43 @@ export default async function PlansPage() {
               className="rounded-2xl p-4 space-y-3"
               style={{ backgroundColor: "#111111", border: "1px solid #1f1f1f" }}
             >
-              <div className="flex items-start justify-between gap-4">
-                <div>
-                  <h2
-                    className="text-3xl leading-none text-white"
-                    style={{ fontFamily: "'Bebas Neue', sans-serif" }}
-                  >
-                    {plan.name}
-                  </h2>
-                  <p className="text-sm text-[#666] mt-2">{plan.description}</p>
+              <div className="grid grid-cols-[92px_1fr] gap-4 items-start">
+                {exerciseByName[plan.exerciseNames[0]] ? (
+                  <ExerciseVisual
+                    name={exerciseByName[plan.exerciseNames[0]].name}
+                    category={exerciseByName[plan.exerciseNames[0]].category}
+                    visualPath={exerciseByName[plan.exerciseNames[0]].visualPath}
+                    accentColor={exerciseByName[plan.exerciseNames[0]].accentColor}
+                    accentSoft={exerciseByName[plan.exerciseNames[0]].accentSoft}
+                  />
+                ) : (
+                  <div
+                    className="rounded-2xl h-24"
+                    style={{ backgroundColor: "#171717" }}
+                  />
+                )}
+
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <h2
+                      className="text-3xl leading-none text-white"
+                      style={{ fontFamily: "'Bebas Neue', sans-serif" }}
+                    >
+                      {plan.name}
+                    </h2>
+                    <p className="text-sm text-[#666] mt-2">{plan.description}</p>
+                  </div>
+                  <form action={handleStartBuiltInPlan}>
+                    <input type="hidden" name="slug" value={plan.slug} />
+                    <button
+                      type="submit"
+                      className="px-4 py-2 rounded-xl text-sm font-semibold text-black"
+                      style={{ backgroundColor: "#c8ff00" }}
+                    >
+                      Start
+                    </button>
+                  </form>
                 </div>
-                <form action={handleStartBuiltInPlan}>
-                  <input type="hidden" name="slug" value={plan.slug} />
-                  <button
-                    type="submit"
-                    className="px-4 py-2 rounded-xl text-sm font-semibold text-black"
-                    style={{ backgroundColor: "#c8ff00" }}
-                  >
-                    Start
-                  </button>
-                </form>
               </div>
 
               <div className="flex flex-wrap gap-2">
@@ -159,27 +182,66 @@ export default async function PlansPage() {
                     {groupedExercises[category].map((exercise) => (
                       <label
                         key={exercise.id}
-                        className="flex items-start gap-3 rounded-xl px-3 py-2 border"
+                        className="grid grid-cols-[64px_1fr] gap-3 rounded-xl px-3 py-3 border"
                         style={{
                           borderColor: "#222",
                           backgroundColor: "#171717",
                         }}
                       >
-                        <input
-                          type="checkbox"
-                          name="exerciseIds"
-                          value={exercise.id}
-                          className="mt-1"
+                        <ExerciseVisual
+                          name={exercise.name}
+                          category={exercise.category}
+                          visualPath={exercise.visualPath}
+                          accentColor={exercise.accentColor}
+                          accentSoft={exercise.accentSoft}
+                          size="sm"
                         />
                         <span className="block">
-                          <span className="block text-sm text-white">
-                            {exercise.name}
-                          </span>
-                          {exercise.description && (
-                            <span className="block text-xs text-[#666] mt-1">
-                              {exercise.description}
+                          <span className="flex items-start gap-3">
+                            <input
+                              type="checkbox"
+                              name="exerciseIds"
+                              value={exercise.id}
+                              className="mt-1"
+                            />
+                            <span className="block min-w-0">
+                              <span className="block text-sm text-white">
+                                {exercise.name}
+                              </span>
+                              {exercise.description && (
+                                <span className="block text-xs text-[#666] mt-1">
+                                  {exercise.description}
+                                </span>
+                              )}
+                              <span className="flex flex-wrap gap-2 mt-2">
+                                {exercise.equipment && (
+                                  <span
+                                    className="px-2 py-1 rounded-full text-[10px]"
+                                    style={{
+                                      backgroundColor: "#1d1d1d",
+                                      color: "#adadad",
+                                    }}
+                                  >
+                                    {exercise.equipment}
+                                  </span>
+                                )}
+                                {exercise.primaryMuscles
+                                  .slice(0, 2)
+                                  .map((muscle) => (
+                                    <span
+                                      key={muscle}
+                                      className="px-2 py-1 rounded-full text-[10px]"
+                                      style={{
+                                        backgroundColor: exercise.accentSoft,
+                                        color: "#f0f0f0",
+                                      }}
+                                    >
+                                      {muscle}
+                                    </span>
+                                  ))}
+                              </span>
                             </span>
-                          )}
+                          </span>
                         </span>
                       </label>
                     ))}
