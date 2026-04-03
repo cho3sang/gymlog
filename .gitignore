@@ -7,3 +7,4 @@ coverage
 npm-debug.log*
 mnt/user-data
 .vercel
+.env*.local

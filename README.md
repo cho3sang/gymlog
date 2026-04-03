@@ -4,6 +4,21 @@ GymLog is a mobile-first workout tracker for logging lifting sessions, reviewing
 
 It is built with Next.js, TypeScript, Prisma, and PostgreSQL, with a simple demo-user flow so you can run it locally without setting up auth first.
 
+## Live Demo
+
+[https://gymlog-seven.vercel.app](https://gymlog-seven.vercel.app)
+
+The live deployment is a shared public demo using the current demo-user flow, so it is best treated as a portfolio preview rather than a private personal tracker.
+
+## Screenshots
+
+<p align="center">
+  <img src="./public/screenshots/home.png" alt="GymLog home screen" width="230" />
+  <img src="./public/screenshots/log.png" alt="GymLog workout logging screen" width="230" />
+  <img src="./public/screenshots/plans.png" alt="GymLog plans screen" width="230" />
+  <img src="./public/screenshots/history.png" alt="GymLog history screen" width="230" />
+</p>
+
 ## What It Demonstrates
 
 - Full-stack Next.js App Router architecture
