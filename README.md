@@ -13,7 +13,7 @@ The live deployment supports both account creation and guest sessions. It is sti
 ## Screenshots
 
 <p align="center">
-  <img src="./public/screenshots/home.png" alt="GymLog home screen" width="230" />
+  <img src="./public/screenshots/home.png" alt="GymLog dashboard screen" width="230" />
   <img src="./public/screenshots/log.png" alt="GymLog workout logging screen" width="230" />
   <img src="./public/screenshots/plans.png" alt="GymLog plans screen" width="230" />
   <img src="./public/screenshots/history.png" alt="GymLog history screen" width="230" />
