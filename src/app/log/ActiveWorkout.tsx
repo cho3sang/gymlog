@@ -125,6 +125,8 @@ export default function ActiveWorkout({
   const hasExactMatch = availableExercises.some(
     (exercise) => exercise.name.toLowerCase() === normalizedSearch
   );
+  const customExerciseName = exerciseSearch.trim();
+  const customExerciseKey = `custom:${customExerciseName}`;
 
   const getInput = (exerciseId: string) =>
     setInputs[exerciseId] ?? { weight: "", reps: "", error: "" };
@@ -214,10 +216,10 @@ export default function ActiveWorkout({
   };
 
   const handleAddCustomExercise = async () => {
-    const name = exerciseSearch.trim();
+    const name = customExerciseName;
     if (!name) return;
 
-    setAddingExerciseKey(`custom:${name}`);
+    setAddingExerciseKey(customExerciseKey);
     setError("");
 
     try {
@@ -362,6 +364,36 @@ export default function ActiveWorkout({
           className="w-full bg-[#1a1a1a] border border-[#2e2e2e] rounded-xl px-4 py-3 text-sm text-white placeholder-[#444] focus:border-[#c8ff00] focus:outline-none"
         />
 
+        <div
+          className="rounded-xl border p-3 space-y-2"
+          style={{ borderColor: "#252525", backgroundColor: "#151515" }}
+        >
+          <div className="flex items-center justify-between gap-3">
+            <p className="text-xs text-[#666] uppercase tracking-widest">
+              Custom Exercise
+            </p>
+            <span className="text-[10px] text-[#555]">
+              Private to your account
+            </span>
+          </div>
+          <p className="text-xs text-[#777]">
+            If your movement is not in the library, type the name above and add
+            it directly.
+          </p>
+          <button
+            onClick={handleAddCustomExercise}
+            disabled={!customExerciseName || addingExerciseKey === customExerciseKey}
+            className="w-full rounded-xl px-4 py-3 text-left font-semibold text-black disabled:opacity-50"
+            style={{ backgroundColor: "#c8ff00" }}
+          >
+            {addingExerciseKey === customExerciseKey
+              ? "Adding custom exercise..."
+              : customExerciseName
+                ? `Add "${customExerciseName}" as a custom exercise`
+                : "Type a name above to add a custom exercise"}
+          </button>
+        </div>
+
         {normalizedSearch ? (
           <div className="space-y-2">
             {matchingExercises.length > 0 ? (
@@ -449,16 +481,9 @@ export default function ActiveWorkout({
             )}
 
             {!hasExactMatch && (
-              <button
-                onClick={handleAddCustomExercise}
-                disabled={addingExerciseKey === `custom:${exerciseSearch.trim()}`}
-                className="w-full rounded-xl px-4 py-3 text-left font-semibold text-black disabled:opacity-50"
-                style={{ backgroundColor: "#c8ff00" }}
-              >
-                {addingExerciseKey === `custom:${exerciseSearch.trim()}`
-                  ? "Adding custom exercise…"
-                  : `Add "${exerciseSearch.trim()}" as a custom exercise`}
-              </button>
+              <p className="text-xs text-[#666]">
+                No exact match? Use the custom exercise button above.
+              </p>
             )}
           </div>
         ) : (

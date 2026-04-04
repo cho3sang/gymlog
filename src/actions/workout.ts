@@ -3,6 +3,11 @@
 import { prisma } from "@/lib/prisma";
 import { requireCurrentViewer } from "@/lib/current-user";
 import {
+  getLibraryExerciseLookupKey,
+  getUserExerciseLookupKey,
+  normalizeExerciseName,
+} from "@/lib/exercise-lookup";
+import {
   BUILT_IN_PLANS,
   EXERCISE_LIBRARY,
   findBuiltInPlan,
@@ -12,7 +17,7 @@ import {
 import { revalidatePath } from "next/cache";
 
 function normalizeName(value: string) {
-  return value.trim().replace(/\s+/g, " ");
+  return normalizeExerciseName(value);
 }
 
 function decorateExercise<T extends {
@@ -53,14 +58,16 @@ async function ensureExerciseLibrary() {
   await Promise.all(
     EXERCISE_LIBRARY.map((exercise) =>
       prisma.exercise.upsert({
-        where: { name: exercise.name },
+        where: { lookupKey: getLibraryExerciseLookupKey(exercise.name) },
         update: {
+          name: exercise.name,
           category: exercise.category,
           description: exercise.description,
           isLibrary: true,
         },
         create: {
           name: exercise.name,
+          lookupKey: getLibraryExerciseLookupKey(exercise.name),
           category: exercise.category,
           description: exercise.description,
           isLibrary: true,
@@ -203,14 +210,16 @@ async function getOrCreateExerciseByName(userId: string, name: string) {
 
   if (libraryExercise) {
     return prisma.exercise.upsert({
-      where: { name: libraryExercise.name },
+      where: { lookupKey: getLibraryExerciseLookupKey(libraryExercise.name) },
       update: {
+        name: libraryExercise.name,
         category: libraryExercise.category,
         description: libraryExercise.description,
         isLibrary: true,
       },
       create: {
         name: libraryExercise.name,
+        lookupKey: getLibraryExerciseLookupKey(libraryExercise.name),
         category: libraryExercise.category,
         description: libraryExercise.description,
         isLibrary: true,
@@ -219,25 +228,19 @@ async function getOrCreateExerciseByName(userId: string, name: string) {
   }
 
   const existingExercise = await prisma.exercise.findUnique({
-    where: { name: normalized },
+    where: {
+      lookupKey: getUserExerciseLookupKey(userId, normalized),
+    },
   });
 
   if (existingExercise) {
-    if (
-      existingExercise.isLibrary ||
-      existingExercise.createdById === userId
-    ) {
-      return existingExercise;
-    }
-
-    throw new Error(
-      "That exercise name is already in use. Try a more specific custom name."
-    );
+    return existingExercise;
   }
 
   return prisma.exercise.create({
     data: {
       name: normalized,
+      lookupKey: getUserExerciseLookupKey(userId, normalized),
       createdById: userId,
     },
   });

@@ -35,7 +35,8 @@ model WorkoutSession {
 
 model Exercise {
   id          String               @id @default(cuid())
-  name        String               @unique
+  name        String
+  lookupKey   String               @unique
   description String?
   category    String?
   isLibrary   Boolean              @default(false)
@@ -44,6 +45,8 @@ model Exercise {
   sessions    SessionExercise[]
   sets        SetEntry[]
   planEntries WorkoutPlanExercise[]
+
+  @@index([name])
 }
 
 model SessionExercise {
