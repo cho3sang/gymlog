@@ -59,15 +59,25 @@ export default async function DashboardPage() {
             </p>
           </div>
 
-          <form action={logout}>
-            <button
-              type="submit"
+          {viewer.isGuest ? (
+            <Link
+              href="/guest/exit"
               className="rounded-xl border px-3 py-2 text-xs font-semibold"
               style={{ borderColor: "#262626", color: "#d0d0d0" }}
             >
               Sign Out
-            </button>
-          </form>
+            </Link>
+          ) : (
+            <form action={logout}>
+              <button
+                type="submit"
+                className="rounded-xl border px-3 py-2 text-xs font-semibold"
+                style={{ borderColor: "#262626", color: "#d0d0d0" }}
+              >
+                Sign Out
+              </button>
+            </form>
+          )}
         </div>
 
         {viewer.isGuest && (
@@ -75,8 +85,9 @@ export default async function DashboardPage() {
             className="rounded-2xl border px-4 py-3 text-sm text-[#8d8d8d]"
             style={{ borderColor: "#2a2a2a", backgroundColor: "#111111" }}
           >
-            Guest mode is great for testing the app, but the session only stays
-            tied to this browser until you sign out.
+            Guest mode is great for testing the app. If you want to keep your
+            workouts, history, and plans, save this guest session to an account
+            before signing out.
           </div>
         )}
       </header>

@@ -72,10 +72,14 @@ export default function AuthPanel() {
 
           <div className="space-y-3">
             <div>
-              <label className="text-[10px] uppercase tracking-[0.24em] text-[#666] block mb-2">
+              <label
+                htmlFor="login-email"
+                className="text-[10px] uppercase tracking-[0.24em] text-[#666] block mb-2"
+              >
                 Email
               </label>
               <input
+                id="login-email"
                 type="email"
                 name="email"
                 required
@@ -87,10 +91,14 @@ export default function AuthPanel() {
             </div>
 
             <div>
-              <label className="text-[10px] uppercase tracking-[0.24em] text-[#666] block mb-2">
+              <label
+                htmlFor="login-password"
+                className="text-[10px] uppercase tracking-[0.24em] text-[#666] block mb-2"
+              >
                 Password
               </label>
               <input
+                id="login-password"
                 type="password"
                 name="password"
                 required
@@ -134,10 +142,14 @@ export default function AuthPanel() {
 
           <div className="space-y-3">
             <div>
-              <label className="text-[10px] uppercase tracking-[0.24em] text-[#666] block mb-2">
+              <label
+                htmlFor="signup-name"
+                className="text-[10px] uppercase tracking-[0.24em] text-[#666] block mb-2"
+              >
                 Name
               </label>
               <input
+                id="signup-name"
                 type="text"
                 name="name"
                 required
@@ -151,10 +163,14 @@ export default function AuthPanel() {
             </div>
 
             <div>
-              <label className="text-[10px] uppercase tracking-[0.24em] text-[#666] block mb-2">
+              <label
+                htmlFor="signup-email"
+                className="text-[10px] uppercase tracking-[0.24em] text-[#666] block mb-2"
+              >
                 Email
               </label>
               <input
+                id="signup-email"
                 type="email"
                 name="email"
                 required
@@ -166,10 +182,14 @@ export default function AuthPanel() {
             </div>
 
             <div>
-              <label className="text-[10px] uppercase tracking-[0.24em] text-[#666] block mb-2">
+              <label
+                htmlFor="signup-password"
+                className="text-[10px] uppercase tracking-[0.24em] text-[#666] block mb-2"
+              >
                 Password
               </label>
               <input
+                id="signup-password"
                 type="password"
                 name="password"
                 required
